@@ -13,6 +13,11 @@ struct ScanCommands: Commands {
             }
             .keyboardShortcut("o", modifiers: [.command])
 
+            Button(String(localized: "Scan with Filter...", comment: "Menu item to scan a folder with a pre-selected filter")) {
+                NotificationCenter.default.post(name: .scanWithFilter, object: nil)
+            }
+            .keyboardShortcut("n", modifiers: [.command, .shift])
+
             Button(String(localized: "Save Scan...", comment: "Menu item to save scan results")) {
                 NotificationCenter.default.post(name: .saveScan, object: nil)
             }
@@ -36,6 +41,32 @@ struct ScanCommands: Commands {
                 NotificationCenter.default.post(name: .rescanVisible, object: nil)
             }
 
+            Button(String(localized: "Rescan Selected", comment: "Menu item to rescan only the selected item")) {
+                NotificationCenter.default.post(name: .rescanSelected, object: nil)
+            }
+
+            Divider()
+
+            Button(String(localized: "Show Inspector", comment: "Menu item to toggle the inspector panel")) {
+                NotificationCenter.default.post(name: .toggleInspector, object: nil)
+            }
+            .keyboardShortcut("i", modifiers: [.command, .option])
+
+            Divider()
+
+            Button(String(localized: "Toggle Mask", comment: "Menu item to toggle filter mask mode")) {
+                NotificationCenter.default.post(name: .toggleMask, object: nil)
+            }
+            .keyboardShortcut("m", modifiers: [.command, .option])
+
+            Button(String(localized: "Show Package Contents", comment: "Menu item to toggle package contents visibility")) {
+                NotificationCenter.default.post(name: .togglePackageContents, object: nil)
+            }
+
+            Button(String(localized: "Show Entire Volume", comment: "Menu item to toggle entire volume display")) {
+                NotificationCenter.default.post(name: .toggleEntireVolume, object: nil)
+            }
+
             Divider()
 
             Button(String(localized: "Duplicate View", comment: "Menu item to duplicate current window")) {
@@ -45,6 +76,13 @@ struct ScanCommands: Commands {
 
             Button(String(localized: "Twin View (Filtered)", comment: "Menu item to open twin filtered window")) {
                 NotificationCenter.default.post(name: .twinView, object: nil)
+            }
+        }
+
+        CommandGroup(after: .pasteboard) {
+            Divider()
+            Button(String(localized: "Edit Scan Comments...", comment: "Menu item to edit scan comments")) {
+                NotificationCenter.default.post(name: .editScanComments, object: nil)
             }
         }
 
@@ -83,9 +121,16 @@ extension Notification.Name {
     static let showFilterList = Notification.Name("showFilterList")
     static let showImageExport = Notification.Name("showImageExport")
     static let showTypeRanking = Notification.Name("showTypeRanking")
+    static let scanWithFilter = Notification.Name("scanWithFilter")
     static let rescanDefault = Notification.Name("rescanDefault")
     static let rescanAll = Notification.Name("rescanAll")
     static let rescanVisible = Notification.Name("rescanVisible")
+    static let rescanSelected = Notification.Name("rescanSelected")
+    static let toggleInspector = Notification.Name("toggleInspector")
+    static let editScanComments = Notification.Name("editScanComments")
+    static let toggleMask = Notification.Name("toggleMask")
+    static let togglePackageContents = Notification.Name("togglePackageContents")
+    static let toggleEntireVolume = Notification.Name("toggleEntireVolume")
     static let duplicateView = Notification.Name("duplicateView")
     static let twinView = Notification.Name("twinView")
 }

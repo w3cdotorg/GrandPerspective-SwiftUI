@@ -33,15 +33,48 @@ final class AppState {
     enum RescanScope: String, CaseIterable {
         case all = "Rescan All"
         case visible = "Rescan Visible"
+        case selected = "Rescan Selected"
     }
+
+    /// The last clicked/selected node (distinct from hover, used for Rescan Selected).
+    var selectedNode: FileNode?
 
     // MARK: - Display state
 
     var colorMapping: any ColorMapping = FolderColorMapping()
     var hoveredNode: FileNode?
     var zoomRoot: FileNode?
+    var showInspector: Bool = false
+
+    /// Gradient intensity for treemap cell rendering (0.0 = flat, 1.0 = maximum gradient).
+    var gradientIntensity: Double = 0.5
+
+    /// The selected color palette for palette-based mappings.
+    var selectedPalette: ColorPalette = .default {
+        didSet { reapplyColorMapping() }
+    }
+
+    /// When false, packages (.app, .framework, etc.) are shown as opaque files.
+    var showPackageContents: Bool = true {
+        didSet { recomputeDisplayTree() }
+    }
+
+    /// When true, wraps the scan tree in a volume root with free/misc synthetic nodes.
+    var showEntireVolume: Bool = false {
+        didSet { recomputeDisplayTree() }
+    }
 
     // MARK: - Filters
+
+    enum FilterMode: String, CaseIterable {
+        case filter = "Filter"
+        case mask = "Mask"
+    }
+
+    /// Filter mode: `.filter` removes non-matching nodes, `.mask` grays them out.
+    var filterMode: FilterMode = .filter {
+        didSet { recomputeFilteredTree() }
+    }
 
     let filterRepository = FilterRepository()
     var appliedFilter: NamedFilter? {
@@ -51,9 +84,32 @@ final class AppState {
     /// The tree after applying the current filter. Nil if no filter or no scan.
     private(set) var filteredTree: FileNode?
 
-    /// The effective root for display: filtered tree, or scan tree.
+    /// IDs of nodes that fail the filter (used in mask mode for grayed-out rendering).
+    private(set) var maskedNodeIDs: Set<UUID> = []
+
+    /// Cached tree with packages collapsed (when showPackageContents is off).
+    private(set) var packageCollapsedTree: FileNode?
+
+    /// Cached volume-wrapped tree (when showEntireVolume is on).
+    private(set) var volumeTree: FileNode?
+
+    /// The effective root for display, applying filters, package collapsing, and volume wrapping.
     var displayTree: FileNode? {
-        filteredTree ?? scanResult?.scanTree
+        volumeTree ?? packageCollapsedTree ?? filteredTree ?? scanResult?.scanTree
+    }
+
+    /// Recomputes the display tree pipeline: filter → package collapse → volume wrap.
+    private func recomputeDisplayTree() {
+        let base = filteredTree ?? scanResult?.scanTree
+        packageCollapsedTree = showPackageContents ? nil : base.map { collapsePackages($0) }
+        volumeTree = showEntireVolume ? wrapInVolume() : nil
+
+        // Reset zoom if target is no longer reachable
+        if let zoomRoot, let tree = displayTree {
+            if !isNode(zoomRoot, reachableFrom: tree) {
+                self.zoomRoot = nil
+            }
+        }
     }
 
     // MARK: - Preferences (bridged from @AppStorage)
@@ -72,6 +128,18 @@ final class AppState {
 
     @ObservationIgnored
     @AppStorage("defaultRescanAction") var defaultRescanAction = RescanScope.all.rawValue
+
+    @ObservationIgnored
+    @AppStorage("fileSizeMeasure") var fileSizeMeasure = "logical"
+
+    @ObservationIgnored
+    @AppStorage("fileSizeUnitSystem") var fileSizeUnitSystem = "decimal"
+
+    @ObservationIgnored
+    @AppStorage("selectedPaletteName") var selectedPaletteName = ColorPalette.default.name
+
+    @ObservationIgnored
+    @AppStorage("gradientIntensityPref") var gradientIntensityPref = 0.5
 
     /// Pending deletion confirmation state.
     var pendingDeletion: PendingDeletion?
@@ -107,6 +175,22 @@ final class AppState {
         return name
     }
 
+    /// Reapply the current color mapping name with the current palette.
+    func reapplyColorMapping() {
+        let name = colorMapping.name
+        if let mapping = ColorMappings.named(name, palette: selectedPalette) {
+            colorMapping = mapping
+        }
+    }
+
+    /// Load palette and gradient from persisted preferences.
+    func loadColorPreferences() {
+        if let palette = ColorPalette.named(selectedPaletteName) {
+            selectedPalette = palette
+        }
+        gradientIntensity = gradientIntensityPref
+    }
+
     /// Load an existing scan result (used for duplicate/twin windows).
     func loadScanResult(_ result: ScanResult, url: URL?, filter: NamedFilter? = nil) {
         scanResult = result
@@ -115,9 +199,10 @@ final class AppState {
         filteredTree = nil
         zoomRoot = nil
         hoveredNode = nil
+        selectedNode = nil
         appliedFilter = filter
 
-        if let mapping = ColorMappings.named(defaultColorMappingName) {
+        if let mapping = ColorMappings.named(defaultColorMappingName, palette: selectedPalette) {
             colorMapping = mapping
         }
     }
@@ -134,6 +219,7 @@ final class AppState {
         filteredTree = nil
         zoomRoot = nil
         hoveredNode = nil
+        selectedNode = nil
         appliedFilter = nil
 
         let scanner = FileSystemScanner(sizeMeasure: sizeMeasure)
@@ -171,8 +257,14 @@ final class AppState {
                 scanResult = result
                 scanPhase = .completed
 
+                // Apply pending filter if this was a filtered scan
+                if let pendingFilter = pendingFilterAfterScan {
+                    appliedFilter = pendingFilter
+                    pendingFilterAfterScan = nil
+                }
+
                 // Apply default color mapping from preferences
-                if let mapping = ColorMappings.named(defaultColorMappingName) {
+                if let mapping = ColorMappings.named(defaultColorMappingName, palette: selectedPalette) {
                     colorMapping = mapping
                 }
             } catch is CancellationError {
@@ -206,6 +298,9 @@ final class AppState {
             // Rescan the visible subtree (zoomRoot or full tree)
             let visibleRoot = zoomRoot ?? scanResult.scanTree
             guard let url = fileURL(for: visibleRoot) else { return }
+            startScan(url: url, sizeMeasure: sizeMeasure)
+        case .selected:
+            guard let node = selectedNode, let url = fileURL(for: node) else { return }
             startScan(url: url, sizeMeasure: sizeMeasure)
         }
     }
@@ -241,17 +336,36 @@ final class AppState {
     // MARK: - Filtering
 
     private func recomputeFilteredTree() {
+        maskedNodeIDs = []
+
         guard let scanResult, let appliedFilter else {
             filteredTree = nil
+            recomputeDisplayTree()
             return
         }
 
-        filteredTree = filterTree(scanResult.scanTree, with: appliedFilter.filter)
+        if filterMode == .mask {
+            // Mask mode: keep all nodes but track which ones fail
+            filteredTree = nil
+            var masked = Set<UUID>()
+            collectMaskedIDs(scanResult.scanTree, filter: appliedFilter.filter, into: &masked)
+            maskedNodeIDs = masked
+        } else {
+            // Filter mode: remove non-matching nodes
+            filteredTree = filterTree(scanResult.scanTree, with: appliedFilter.filter)
+        }
+        recomputeDisplayTree()
+    }
 
-        // Reset zoom if the zoom target is no longer in the filtered tree
-        if let zoomRoot, filteredTree != nil {
-            if !isNode(zoomRoot, reachableFrom: filteredTree!) {
-                self.zoomRoot = nil
+    /// Collects IDs of leaf nodes that fail the filter (for mask mode).
+    private func collectMaskedIDs(_ node: FileNode, filter: FileFilter, into ids: inout Set<UUID>) {
+        if node.isDirectory {
+            for child in node.children {
+                collectMaskedIDs(child, filter: filter, into: &ids)
+            }
+        } else {
+            if !filter.passes(node) {
+                ids.insert(node.id)
             }
         }
     }
@@ -284,6 +398,74 @@ final class AppState {
     private func isNode(_ target: FileNode, reachableFrom root: FileNode) -> Bool {
         if root.id == target.id { return true }
         return root.children.contains { isNode(target, reachableFrom: $0) }
+    }
+
+    // MARK: - Package collapsing
+
+    /// Returns a copy of the tree where packages are treated as opaque files (no children).
+    private func collapsePackages(_ node: FileNode) -> FileNode {
+        if node.isPackage {
+            // Treat as a leaf file — keep size but drop children
+            return FileNode(
+                name: node.name,
+                kind: .file,
+                size: node.size,
+                creationDate: node.creationDate,
+                modificationDate: node.modificationDate,
+                accessDate: node.accessDate,
+                flags: node.flags,
+                type: node.type
+            )
+        }
+        guard node.isDirectory else { return node }
+        let collapsed = node.children.map { collapsePackages($0) }
+        return FileNode(
+            name: node.name,
+            kind: node.kind,
+            size: node.size,
+            children: collapsed,
+            creationDate: node.creationDate,
+            modificationDate: node.modificationDate,
+            accessDate: node.accessDate,
+            flags: node.flags,
+            type: node.type
+        )
+    }
+
+    // MARK: - Volume wrapping
+
+    /// Wraps the current display tree in a volume root with free/misc synthetic nodes.
+    private func wrapInVolume() -> FileNode? {
+        guard let scanResult else { return nil }
+        let base = packageCollapsedTree ?? filteredTree ?? scanResult.scanTree
+
+        var children: [FileNode] = [base]
+
+        let misc = scanResult.miscUsedSpace
+        if misc > 0 {
+            children.append(FileNode(
+                name: String(localized: "Misc. used space"),
+                kind: .synthetic(.miscUsedSpace),
+                size: misc
+            ))
+        }
+
+        let free = scanResult.freeSpace
+        if free > 0 {
+            children.append(FileNode(
+                name: String(localized: "Free space"),
+                kind: .synthetic(.freeSpace),
+                size: free
+            ))
+        }
+
+        let totalSize = children.reduce(UInt64(0)) { $0 + $1.size }
+        return FileNode(
+            name: scanResult.volumePath,
+            kind: .directory,
+            size: totalSize,
+            children: children
+        )
     }
 
     // MARK: - File operations
@@ -413,7 +595,35 @@ final class AppState {
         panel.message = "Select a folder to scan"
 
         guard panel.runModal() == .OK, let url = panel.url else { return }
-        startScan(url: url)
+        startScan(url: url, sizeMeasure: preferredSizeMeasure)
+    }
+
+    /// The size measure derived from the user preference.
+    var preferredSizeMeasure: FileSystemScanner.SizeMeasure {
+        FileSystemScanner.SizeMeasure(rawValue: fileSizeMeasure) ?? .logical
+    }
+
+    /// Pending filter to apply after scan completes (for "Scan with Filter" flow).
+    @ObservationIgnored
+    var pendingFilterAfterScan: NamedFilter?
+
+    /// Start a scan that will automatically apply a filter once completed.
+    func startFilteredScan(url: URL, filter: NamedFilter, sizeMeasure: FileSystemScanner.SizeMeasure = .logical) {
+        pendingFilterAfterScan = filter
+        startScan(url: url, sizeMeasure: sizeMeasure)
+    }
+
+    /// Show folder picker then apply filter after scan. Returns false if user cancelled folder selection.
+    func selectFolderForFilteredScan(filter: NamedFilter) -> Bool {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = "Select a folder to scan with filter"
+
+        guard panel.runModal() == .OK, let url = panel.url else { return false }
+        startFilteredScan(url: url, filter: filter)
+        return true
     }
 
     // MARK: - Document persistence
@@ -463,7 +673,7 @@ final class AppState {
             hoveredNode = nil
             appliedFilter = nil
 
-            if let mapping = ColorMappings.named(defaultColorMappingName) {
+            if let mapping = ColorMappings.named(defaultColorMappingName, palette: selectedPalette) {
                 colorMapping = mapping
             }
         } catch {

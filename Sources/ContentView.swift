@@ -10,6 +10,8 @@ struct ContentView: View {
     @State private var showingImageExport = false
     @State private var showingTypeRanking = false
     @State private var showingTwinFilterPicker = false
+    @State private var showingFilteredScanPicker = false
+    @State private var showingScanComments = false
     @State private var isDropTargeted = false
 
     var body: some View {
@@ -33,12 +35,8 @@ struct ContentView: View {
                             zoomRoot: $state.zoomRoot
                         )
 
-                        if let hoveredNode = appState.hoveredNode {
-                            NodeInfoBar(node: hoveredNode, scanResult: scanResult)
-                                .transition(.move(edge: .bottom).combined(with: .opacity))
-                        }
+                        NodeInfoBar(node: appState.hoveredNode, scanResult: scanResult)
                     }
-                    .animation(.easeOut(duration: 0.15), value: appState.hoveredNode?.id)
                 }
 
             case .scanning(let path):
@@ -61,6 +59,18 @@ struct ContentView: View {
         } isTargeted: { targeted in
             isDropTargeted = targeted
         }
+        .inspector(isPresented: Binding(
+            get: { appState.showInspector },
+            set: { appState.showInspector = $0 }
+        )) {
+            if let scanResult = appState.scanResult {
+                InfoPanelView(
+                    scanResult: scanResult,
+                    selectedNode: appState.selectedNode,
+                    hoveredNode: appState.hoveredNode
+                )
+            }
+        }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 Button(String(localized: "Scan Folder"), systemImage: "folder.badge.gearshape") {
@@ -73,10 +83,12 @@ struct ContentView: View {
                     Picker(String(localized: "Colors"), selection: Binding(
                         get: { appState.colorMapping.name },
                         set: { name in
-                            if let m = ColorMappings.named(name) { appState.colorMapping = m }
+                            if let m = ColorMappings.named(name, palette: appState.selectedPalette) {
+                                appState.colorMapping = m
+                            }
                         }
                     )) {
-                        ForEach(ColorMappings.all, id: \.name) { mapping in
+                        ForEach(ColorMappings.all(palette: appState.selectedPalette), id: \.name) { mapping in
                             Text(mapping.name).tag(mapping.name)
                         }
                     }
@@ -96,6 +108,10 @@ struct ContentView: View {
                         Button(String(localized: "Rescan Visible")) {
                             appState.rescan(scope: .visible)
                         }
+                        Button(String(localized: "Rescan Selected")) {
+                            appState.rescan(scope: .selected)
+                        }
+                        .disabled(appState.selectedNode == nil)
                     } label: {
                         Label(String(localized: "Rescan"), systemImage: "arrow.clockwise")
                     }
@@ -182,25 +198,13 @@ struct ContentView: View {
         }
         .frame(minWidth: 600, minHeight: 400)
         .navigationTitle(appState.windowTitle)
-        .onReceive(NotificationCenter.default.publisher(for: .rescanDefault)) { _ in
-            let scope = AppState.RescanScope(rawValue: appState.defaultRescanAction) ?? .all
-            appState.rescan(scope: scope)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .rescanAll)) { _ in
-            appState.rescan(scope: .all)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .rescanVisible)) { _ in
-            appState.rescan(scope: .visible)
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .duplicateView)) { _ in
-            guard let scanResult = appState.scanResult else { return }
-            WindowTransfer.shared.stage(scanResult: scanResult, scanURL: appState.scanURL)
-            openWindow(id: "scan")
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .twinView)) { _ in
-            guard appState.scanResult != nil else { return }
-            showingTwinFilterPicker = true
-        }
+        .modifier(CommandNotificationHandler(
+            appState: appState,
+            openWindow: openWindow,
+            showingTwinFilterPicker: $showingTwinFilterPicker,
+            showingFilteredScanPicker: $showingFilteredScanPicker,
+            showingScanComments: $showingScanComments
+        ))
         .sheet(isPresented: $showingTwinFilterPicker) {
             FilterPickerView(repository: appState.filterRepository) { filter in
                 guard let scanResult = appState.scanResult else { return }
@@ -212,6 +216,73 @@ struct ContentView: View {
                 openWindow(id: "scan")
             }
         }
+        .sheet(isPresented: $showingFilteredScanPicker) {
+            FilterPickerView(repository: appState.filterRepository) { filter in
+                guard let filter else { return }
+                _ = appState.selectFolderForFilteredScan(filter: filter)
+            }
+        }
+        .sheet(isPresented: $showingScanComments) {
+            if let scanResult = appState.scanResult {
+                ScanCommentsView(scanResult: scanResult)
+            }
+        }
+    }
+}
+
+// MARK: - Command Notification Handler
+
+/// Extracted to reduce body complexity and avoid type-checker timeouts.
+private struct CommandNotificationHandler: ViewModifier {
+    let appState: AppState
+    let openWindow: OpenWindowAction
+    @Binding var showingTwinFilterPicker: Bool
+    @Binding var showingFilteredScanPicker: Bool
+    @Binding var showingScanComments: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .onReceive(NotificationCenter.default.publisher(for: .rescanDefault)) { _ in
+                let scope = AppState.RescanScope(rawValue: appState.defaultRescanAction) ?? .all
+                appState.rescan(scope: scope)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .rescanAll)) { _ in
+                appState.rescan(scope: .all)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .rescanVisible)) { _ in
+                appState.rescan(scope: .visible)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .rescanSelected)) { _ in
+                appState.rescan(scope: .selected)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .scanWithFilter)) { _ in
+                showingFilteredScanPicker = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleInspector)) { _ in
+                appState.showInspector.toggle()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleMask)) { _ in
+                appState.filterMode = appState.filterMode == .filter ? .mask : .filter
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .togglePackageContents)) { _ in
+                appState.showPackageContents.toggle()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .toggleEntireVolume)) { _ in
+                appState.showEntireVolume.toggle()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .duplicateView)) { _ in
+                guard let scanResult = appState.scanResult else { return }
+                WindowTransfer.shared.stage(scanResult: scanResult, scanURL: appState.scanURL)
+                openWindow(id: "scan")
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .twinView)) { _ in
+                guard appState.scanResult != nil else { return }
+                showingTwinFilterPicker = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .editScanComments)) { _ in
+                guard appState.scanResult != nil else { return }
+                showingScanComments = true
+            }
     }
 }
 
@@ -279,31 +350,35 @@ struct TreemapView: View {
 // MARK: - Info Bar
 
 struct NodeInfoBar: View {
-    let node: FileNode
+    let node: FileNode?
     let scanResult: ScanResult
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: node.isDirectory ? "folder.fill" : "doc.fill")
-                .foregroundStyle(.secondary)
-            Text(node.path)
-                .lineLimit(1)
-                .truncationMode(.middle)
-            Spacer()
-            if node.isDirectory {
-                Text(String(localized: "\(node.fileCount) files"))
+            if let node {
+                Image(systemName: node.isDirectory ? "folder.fill" : "doc.fill")
                     .foregroundStyle(.secondary)
+                Text(node.path)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                Spacer()
+                if node.isDirectory {
+                    Text(String(localized: "\(node.fileCount) files"))
+                        .foregroundStyle(.secondary)
+                }
+                Text(node.formattedSize)
+                    .monospacedDigit()
+                    .fontWeight(.medium)
+            } else {
+                Spacer()
             }
-            Text(node.formattedSize)
-                .monospacedDigit()
-                .fontWeight(.medium)
         }
         .font(.callout)
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(.ultraThinMaterial)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(String(localized: "\(node.name), \(node.formattedSize)"))
+        .accessibilityLabel(node.map { String(localized: "\($0.name), \($0.formattedSize)") } ?? "")
     }
 }
 

@@ -232,6 +232,113 @@ Features manquantes par rapport au legacy : suppression, reveal, rescan.
 
 ---
 
+## Phase 10 — Scan filtré et rescan sélection ✅
+
+- [x] **Scan filtré** (Cmd+Shift+N) — remplace `filterSelectedScan:` de `DirectoryViewControl`
+  - Menu File > "Scan with Filter…" (⇧⌘N) ouvre un FilterPickerView puis un folder picker
+  - `AppState.startFilteredScan(url:filter:)` — stocke le filtre en `pendingFilterAfterScan`, appliqué automatiquement après le scan
+  - `AppState.selectFolderForFilteredScan(filter:)` — ouvre un NSOpenPanel et lance le scan filtré
+- [x] **Rescan Selected** — remplace `rescanSelected:` / `rescanSelectedItem:`
+  - `AppState.selectedNode` — nœud sélectionné au clic dans le treemap (distinct du hover)
+  - `RescanScope.selected` — nouveau cas, re-scanne le sous-arbre du nœud sélectionné
+  - Menu View > "Rescan Selected" + bouton dans le toolbar Rescan menu
+  - `TreemapCanvasView.onTapGesture` met à jour `selectedNode`
+- [x] **13 tests** : 4 suites (Filtered Scan, Rescan Selected, Selected Node, Scan Commands Notifications)
+
+**Fichiers modifiés :** `Sources/Model/AppState.swift`, `Sources/ScanCommands.swift`, `Sources/ContentView.swift`, `Sources/Views/TreemapCanvasView.swift`, `Tests/Phase10Tests.swift`, `Tests/Phase7Tests.swift`, `Tests/ViewTests.swift`, `Tests/TreemapCanvasViewTests.swift`
+
+---
+
+## Phase 11 — Panneau d'information (Drawer) ✅
+
+Remplace les 3 onglets Drawer du legacy : Display, Info, Focus.
+
+- [x] **InfoPanelView** — panneau latéral via `.inspector()` avec 3 onglets segmentés
+  - **Onglet Display** : volume (path, taille, libre, utilisé), scan (dossier, taille, fichiers, misc, date, mesure), deletions
+  - **Onglet Info** : nom, chemin, taille, type, UTI, kind, dates (création/modification/accès), attributs (fichiers, enfants, hard-link, package)
+  - **Onglet Focus** : nom, chemin, taille, % du parent, % du total, profondeur, nb fichiers
+  - ~30 champs d'information au total, text sélectionnable
+- [x] Menu View > "Show Inspector" (⌥⌘I) toggle via `AppState.showInspector`
+- [x] `AppState.selectedNode` déjà ajouté en Phase 10 (clic dans le treemap)
+- [x] **14 tests** : 5 suites (InfoPanel Display, InfoPanel Info, InfoPanel Focus, Inspector Toggle, InfoPanel Tabs)
+
+**Fichiers créés :** `Sources/Views/InfoPanelView.swift`, `Tests/Phase11Tests.swift`
+**Fichiers modifiés :** `Sources/Model/AppState.swift`, `Sources/ScanCommands.swift`, `Sources/ContentView.swift`
+
+---
+
+## Phase 12 — Affichage volume et paquets ✅
+
+- [x] **Show Package Contents** toggle (remplace `showPackageContents` de `DirectoryViewControl`)
+  - `AppState.showPackageContents: Bool` (défaut true), `collapsePackages(_:)` transforme les packages en fichiers opaques
+  - Pipeline display : filter → package collapse → volume wrap, via `recomputeDisplayTree()`
+  - Menu View > "Show Package Contents"
+- [x] **Show Entire Volume** toggle (remplace `openSelectedVolume:`)
+  - `AppState.showEntireVolume: Bool` (défaut false), `wrapInVolume()` crée un nœud racine volume
+  - Nœuds synthétiques : Free space + Misc. used space ajoutés au volume root
+  - Menu View > "Show Entire Volume"
+- [x] Refactoring : `CommandNotificationHandler` ViewModifier pour éviter type-checker timeout
+- [x] **14 tests** : 3 suites (Package Contents Toggle, Entire Volume Toggle, Package + Volume Combined)
+
+**Fichiers créés :** `Tests/Phase12Tests.swift`
+**Fichiers modifiés :** `Sources/Model/AppState.swift`, `Sources/ScanCommands.swift`, `Sources/ContentView.swift`
+
+---
+
+## Phase 13 — Masque et préférences de taille ✅
+
+- [x] **Mask** (remplace `maskFilter` / `toggleMask:` de `DirectoryViewControl`)
+  - `AppState.FilterMode` enum (`.filter` supprime, `.mask` grise) avec `maskedNodeIDs: Set<UUID>`
+  - `TreemapCanvasView` dessine les nœuds masqués en gris plat (opacity 0.3, sans gradient)
+  - Menu View > "Toggle Mask" (⌥⌘M)
+  - `collectMaskedIDs(_:filter:into:)` pour identifier les nœuds qui échouent au filtre
+- [x] **File Size Measure** — préférence exposée dans l'UI
+  - `@AppStorage("fileSizeMeasure")` — logical / physical
+  - `PreferencesView` > General > picker, `AppState.preferredSizeMeasure` computed property
+  - `selectAndScan()` utilise la préférence
+- [x] **File Size Unit System** — préférence
+  - `@AppStorage("fileSizeUnitSystem")` — decimal / binary
+  - `FileNode.useBinaryUnits` static flag, deux formatters (decimal + binary)
+  - `PreferencesView` > General > picker avec `.onChange` sync
+  - Chargé au démarrage dans `ScanWindow.onAppear`
+- [x] **14 tests** : 3 suites (Filter Mask Mode, File Size Measure, File Size Units)
+
+**Fichiers créés :** `Tests/Phase13Tests.swift`
+**Fichiers modifiés :** `Sources/Model/AppState.swift`, `Sources/Model/FileNode.swift`, `Sources/Views/TreemapCanvasView.swift`, `Sources/ScanCommands.swift`, `Sources/ContentView.swift`, `Sources/PreferencesView.swift`, `Sources/GrandPerspectiveApp.swift`
+
+---
+
+## Phase 14 — Commentaires de scan ✅
+
+- [x] **Scan Comments** — UI éditable (remplace `editComments:` de `DirectoryViewControl`)
+  - `ScanCommentsView` — sheet avec TextEditor, boutons Cancel/Save
+  - Menu Edit > "Edit Scan Comments…"
+  - `ScanResult.comments` déjà en place, `CodableScanResult` déjà sérialisé (JSON round-trip)
+- [x] **8 tests** : 3 suites (Scan Comments, Scan Comments Persistence, Scan Comments Notification)
+
+**Fichiers créés :** `Sources/Views/ScanCommentsView.swift`, `Tests/Phase14Tests.swift`
+**Fichiers modifiés :** `Sources/ScanCommands.swift`, `Sources/ContentView.swift`
+
+---
+
+## Couleurs — Palettes & Mappings ✅
+
+- [x] **18 palettes de couleurs** portées depuis `ColorListCreator.m` (CoffeeBeans, Pastel Papageno, Blue Sky Tulips, Monaco, Warm Fall, Moss and Lichen, Matbord, Bujumbura, Autumn, Olive Sunset, Rainbow, Origami Mice, Green Eggs, Feng Shui, Daytona, Flying Geese, Lagoon Nebula, Autumn Blush)
+- [x] **Couleurs ajustées** pour lisibilité du texte blanc (contrast ratio ≥ 2:1 WCAG contre blanc, vérifié par test)
+- [x] **`Color(hex:)` extension** avec calcul de luminance relative et ratio de contraste
+- [x] **4 nouveaux color mappings** : Top Folder, Extension, Level, Nothing (Uniform)
+- [x] **File Type (UTI)** couleurs remplacées par des hex medium-saturation lisibles
+- [x] **Sélecteur de palette** dans Préférences > Appearance (avec aperçu swatches)
+- [x] **Slider d'intensité du gradient** (0%–100%) dans Préférences > Appearance
+- [x] **Palette persistée** via `@AppStorage("selectedPaletteName")`
+- [x] **9 mappings** dans le registre (Files & Folders, Top Folder, Extension, Level, Nothing, Modification Date, Creation Date, Access Date, File Type)
+- [x] **26 tests** couvrant palettes, hex parsing, readability, et nouveaux mappings
+
+**Fichiers modifiés :** `Sources/Model/ColorMapping.swift`, `Sources/Model/AppState.swift`, `Sources/PreferencesView.swift`, `Sources/ContentView.swift`, `Sources/GrandPerspectiveApp.swift`, `Sources/Views/TreemapCanvasView.swift`
+**Fichiers créés :** `Tests/ColorPaletteTests.swift`
+
+---
+
 ## Notes techniques
 
 - **Deployment target :** macOS 26
@@ -245,7 +352,7 @@ Features manquantes par rapport au legacy : suppression, reveal, rescan.
 
 ---
 
-## Tests — 200 tests, 38 suites ✅
+## Tests — 292 tests, 60 suites ✅
 
 | Suite | Tests | Couverture |
 |---|---|---|
@@ -271,10 +378,28 @@ Features manquantes par rapport au legacy : suppression, reveal, rescan.
 | ScanDocument | 3 | End-to-end JSON round-trip, readable/writable content types |
 | UTType Extension | 1 | .gpscan UTType identifier |
 | AppState DragDrop | 2 | Empty URLs, nonexistent path |
+| Filtered Scan | 4 | Pending filter, start filtered scan, regular scan no pending, clear selected on scan |
+| Rescan Selected | 4 | Requires selected node, directory rescan, selected node set, scope enum cases |
+| Selected Node | 3 | Initially nil, cleared on load, filtered scan sets pending+URL |
+| Scan Commands Notifications | 2 | scanWithFilter + rescanSelected notification names |
+| InfoPanel Display | 3 | Volume info, scan info, deletion tracking |
+| InfoPanel Info | 3 | File fields (dates, UTI, flags), directory children, package type |
+| InfoPanel Focus | 3 | % of parent, % of total, depth calculation |
+| Inspector Toggle | 3 | Initial state, toggle, notification name |
+| InfoPanel Tabs | 2 | All tabs covered, raw values |
+| Package Contents Toggle | 5 | Default true, visible by default, collapsed when off, toggle back, non-package unaffected |
+| Entire Volume Toggle | 7 | Default false, normal display, volume wrap, free space, misc space, toggle off, total size |
+| Package + Volume Combined | 2 | Both toggles together, notification names |
+| Filter Mask Mode | 8 | Default filter, enum cases, filter removes, mask keeps all, mask tracks IDs, switch recomputes, clear clears mask, notification |
+| File Size Measure | 3 | Default logical, preference mapping, invalid fallback |
+| File Size Units | 3 | Decimal formatting, binary formatting, switching changes output |
+| Scan Comments | 4 | Default empty, set, init with value, clear |
+| Scan Comments Persistence | 3 | Round-trip JSON with emoji/newlines, empty round-trip, JSON field present |
+| Scan Comments Notification | 1 | editScanComments notification name |
 
 **Commandes :**
 ```bash
 # Générer le projet et lancer les tests
 /opt/homebrew/bin/xcodegen generate
-xcodebuild -scheme GrandPerspectiveSwiftUI -destination 'platform=macOS,arch=arm64' test
+xcodebuild -scheme GrandPerspective -destination 'platform=macOS,arch=arm64' test
 ```

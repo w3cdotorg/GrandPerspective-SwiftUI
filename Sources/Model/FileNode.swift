@@ -145,14 +145,24 @@ final class FileNode: Identifiable, @unchecked Sendable {
 // MARK: - Size Formatting
 
 extension FileNode {
-    private nonisolated(unsafe) static let sizeFormatter: ByteCountFormatter = {
+    private nonisolated(unsafe) static let decimalFormatter: ByteCountFormatter = {
         let f = ByteCountFormatter()
         f.countStyle = .file
         return f
     }()
 
+    private nonisolated(unsafe) static let binaryFormatter: ByteCountFormatter = {
+        let f = ByteCountFormatter()
+        f.countStyle = .binary
+        return f
+    }()
+
+    /// Current unit system preference. Updated from PreferencesView.
+    nonisolated(unsafe) static var useBinaryUnits: Bool = false
+
     static func formattedSize(_ bytes: UInt64) -> String {
-        sizeFormatter.string(fromByteCount: Int64(clamping: bytes))
+        let formatter = useBinaryUnits ? binaryFormatter : decimalFormatter
+        return formatter.string(fromByteCount: Int64(clamping: bytes))
     }
 
     var formattedSize: String {

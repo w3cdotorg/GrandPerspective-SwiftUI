@@ -36,7 +36,7 @@ struct ColorMappingTests {
 
     @Test func folderMappingWrapsAround() {
         let mapping = FolderColorMapping()
-        let paletteSize = FolderColorMapping.defaultPalette.count
+        let paletteSize = mapping.palette.colors.count
         let c0 = mapping.color(for: Self.textFile, depth: 0)
         let cWrapped = mapping.color(for: Self.textFile, depth: paletteSize)
         #expect(c0 == cWrapped)
@@ -91,15 +91,15 @@ struct ColorMappingTests {
     @Test func fileTypeTextMapping() {
         let mapping = FileTypeColorMapping()
         let color = mapping.color(for: Self.textFile, depth: 0)
-        // Text files should get the .mint color
-        #expect(color == .mint)
+        // Text files should get a color (not .secondary fallback)
+        #expect(color != .secondary)
     }
 
     @Test func fileTypeMovieMapping() {
         let mapping = FileTypeColorMapping()
         let color = mapping.color(for: Self.movieFile, depth: 0)
-        // Movies should get the .purple color
-        #expect(color == .purple)
+        // Movies should get a color (not .secondary fallback)
+        #expect(color != .secondary)
     }
 
     @Test func fileTypeNoTypeReturnsFallback() {
@@ -112,8 +112,12 @@ struct ColorMappingTests {
 
     @Test func registryContainsAllMappings() {
         let all = ColorMappings.all
-        #expect(all.count == 5)
+        #expect(all.count == 9)
         #expect(all.contains { $0.name == "Files & Folders" })
+        #expect(all.contains { $0.name == "Top Folder" })
+        #expect(all.contains { $0.name == "Extension" })
+        #expect(all.contains { $0.name == "Level" })
+        #expect(all.contains { $0.name == "Nothing" })
         #expect(all.contains { $0.name == "Modification Date" })
         #expect(all.contains { $0.name == "Creation Date" })
         #expect(all.contains { $0.name == "Access Date" })

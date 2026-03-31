@@ -72,11 +72,26 @@ actor FileSystemScanner {
         var childNodes: [FileNode] = []
         var totalSize: UInt64 = 0
 
-        let contents = try fm.contentsOfDirectory(
-            at: url,
-            includingPropertiesForKeys: Array(resourceKeys),
-            options: [.skipsHiddenFiles]
-        )
+        let contents: [URL]
+        do {
+            contents = try fm.contentsOfDirectory(
+                at: url,
+                includingPropertiesForKeys: Array(resourceKeys),
+                options: [.skipsHiddenFiles]
+            )
+        } catch {
+            // Permission denied or other access error — return an empty directory
+            let flags = makeFlags(values)
+            return FileNode(
+                name: name,
+                kind: .directory,
+                size: 0,
+                creationDate: values.creationDate,
+                modificationDate: values.contentModificationDate,
+                accessDate: values.contentAccessDate,
+                flags: flags
+            )
+        }
 
         for childURL in contents {
             guard !cancelled else { throw CancellationError() }
@@ -88,11 +103,11 @@ actor FileSystemScanner {
             let isPackage = childValues.isPackage ?? false
 
             if isDir && !(treatPackagesAsFiles && isPackage) {
-                let dirNode = try scanDirectory(
+                guard let dirNode = try? scanDirectory(
                     url: childURL,
                     fileManager: fm,
                     resourceKeys: resourceKeys
-                )
+                ) else { continue }
                 totalSize += dirNode.size
                 childNodes.append(dirNode)
             } else {

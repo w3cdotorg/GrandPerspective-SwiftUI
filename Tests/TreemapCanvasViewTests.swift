@@ -38,6 +38,7 @@ struct TreemapCanvasViewTests {
             hoveredNode: .constant(nil),
             zoomRoot: .constant(nil)
         )
+        .environment(AppState())
         .frame(width: 600, height: 400)
 
         let renderer = ImageRenderer(content: view)
@@ -116,6 +117,7 @@ struct TreemapCanvasViewTests {
                 hoveredNode: .constant(nil),
                 zoomRoot: .constant(nil)
             )
+            .environment(AppState())
             .frame(width: 400, height: 300)
 
             let renderer = ImageRenderer(content: view)

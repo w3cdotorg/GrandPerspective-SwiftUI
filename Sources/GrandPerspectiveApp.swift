@@ -30,6 +30,9 @@ struct ScanWindow: View {
         ContentView()
             .environment(appState)
             .onAppear {
+                // Sync unit system preference to formatter
+                FileNode.useBinaryUnits = (appState.fileSizeUnitSystem == "binary")
+                appState.loadColorPreferences()
                 appState.filterRepository.loadFromDisk()
                 if let transfer = WindowTransfer.shared.consume() {
                     appState.loadScanResult(

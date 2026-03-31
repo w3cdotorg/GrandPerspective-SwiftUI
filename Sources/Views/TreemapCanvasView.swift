@@ -5,7 +5,6 @@ import SwiftUI
 struct TreemapCanvasView: View {
     let scanResult: ScanResult
     let colorMapping: any ColorMapping
-    let gradientIntensity: Double
 
     @Binding var hoveredNode: FileNode?
     @Binding var zoomRoot: FileNode?
@@ -15,6 +14,11 @@ struct TreemapCanvasView: View {
     @State private var cachedRects: [TreemapRect] = []
     @State private var viewSize: CGSize = .zero
 
+    /// Gradient intensity from AppState.
+    private var gradientIntensity: Double {
+        appState.gradientIntensity
+    }
+
     /// The node currently displayed as root (zoom target or scan root).
     private var displayRoot: FileNode {
         zoomRoot ?? scanResult.scanTree
@@ -23,13 +27,11 @@ struct TreemapCanvasView: View {
     init(
         scanResult: ScanResult,
         colorMapping: any ColorMapping,
-        gradientIntensity: Double = 0.5,
         hoveredNode: Binding<FileNode?>,
         zoomRoot: Binding<FileNode?>
     ) {
         self.scanResult = scanResult
         self.colorMapping = colorMapping
-        self.gradientIntensity = gradientIntensity
         self._hoveredNode = hoveredNode
         self._zoomRoot = zoomRoot
     }
@@ -38,9 +40,10 @@ struct TreemapCanvasView: View {
         Canvas(rendersAsynchronously: true) { context, size in
             let bounds = CGRect(origin: .zero, size: size)
             let rects = TreemapLayout.layout(root: displayRoot, in: bounds)
+            let maskedIDs = appState.maskedNodeIDs
 
             for treemapRect in rects {
-                drawRect(treemapRect, in: &context)
+                drawRect(treemapRect, maskedIDs: maskedIDs, in: &context)
             }
 
             // Draw labels on rects large enough to show text
@@ -67,6 +70,7 @@ struct TreemapCanvasView: View {
         }
         .onTapGesture { location in
             guard let node = hitTest(point: location) else { return }
+            appState.selectedNode = node
             if node.isDirectory {
                 withAnimation(.easeInOut(duration: 0.25)) {
                     zoomRoot = node
@@ -107,26 +111,32 @@ struct TreemapCanvasView: View {
 
     // MARK: - Drawing
 
-    private func drawRect(_ treemapRect: TreemapRect, in context: inout GraphicsContext) {
+    private func drawRect(_ treemapRect: TreemapRect, maskedIDs: Set<UUID>, in context: inout GraphicsContext) {
         let rect = treemapRect.rect
         guard rect.width >= 1, rect.height >= 1 else { return }
 
-        let baseColor = colorMapping.color(for: treemapRect.node, depth: treemapRect.depth)
+        let isMasked = maskedIDs.contains(treemapRect.node.id)
         let inset = rect.insetBy(dx: 0.5, dy: 0.5)
         let path = Path(inset)
-
         let isHovered = hoveredNode?.id == treemapRect.node.id
 
-        // Gradient fill: lighter at top-left, darker at bottom-right
-        let lightColor = brighten(baseColor, by: gradientIntensity * 0.3)
-        let darkColor = darken(baseColor, by: gradientIntensity * 0.4)
+        if isMasked {
+            // Masked nodes: flat gray, no gradient
+            context.fill(path, with: .color(.gray.opacity(0.3)))
+        } else {
+            let baseColor = colorMapping.color(for: treemapRect.node, depth: treemapRect.depth)
 
-        let gradient = Gradient(colors: [lightColor, darkColor])
-        context.fill(path, with: .linearGradient(
-            gradient,
-            startPoint: CGPoint(x: inset.minX, y: inset.minY),
-            endPoint: CGPoint(x: inset.maxX, y: inset.maxY)
-        ))
+            // Gradient fill: lighter at top-left, darker at bottom-right
+            let lightColor = brighten(baseColor, by: gradientIntensity * 0.3)
+            let darkColor = darken(baseColor, by: gradientIntensity * 0.4)
+
+            let gradient = Gradient(colors: [lightColor, darkColor])
+            context.fill(path, with: .linearGradient(
+                gradient,
+                startPoint: CGPoint(x: inset.minX, y: inset.minY),
+                endPoint: CGPoint(x: inset.maxX, y: inset.maxY)
+            ))
+        }
 
         // Highlight on hover
         if isHovered {

@@ -9,7 +9,9 @@ A pure SwiftUI rewrite of [GrandPerspective](https://grandperspectiv.sourceforge
 - **Zoom & navigation** — click to zoom into directories, breadcrumb bar for navigation
 - **Filters** — composable filter system (size, name, path, type, date, flags, directories-only, files-only, NOT, AND, OR) with full editor UI
 - **Date filters** — filter by creation, modification, or access date ranges
-- **Color mappings** — by folder depth, file type (UTI), creation/modification/access date
+- **Color palettes** — 18 curated palettes (ported from legacy), selectable in Preferences
+- **Color mappings** — 9 schemes: Files & Folders, Top Folder, Extension, Level, Nothing, File Type (UTI), Modification/Creation/Access Date
+- **Gradient intensity** — adjustable gradient slider in Preferences
 - **File operations** — Reveal in Finder, Open, Copy Path, Move to Trash (with confirmation and hard-link warnings)
 - **Context menu** — right-click on any node in the treemap
 - **Rescan** — rescan all or just the visible subtree, configurable default
@@ -18,7 +20,7 @@ A pure SwiftUI rewrite of [GrandPerspective](https://grandperspectiv.sourceforge
 - **Filter persistence** — saved to `~/Library/Application Support/GrandPerspective/filters.json`, auto-loaded on launch
 - **Image export** — export treemap as PNG
 - **File type ranking** — view disk usage breakdown by file type
-- **Preferences** — color mapping, rescan behavior, file deletion policy, confirmations
+- **Preferences** — color mapping, palette selection, gradient intensity, rescan behavior, file deletion policy, confirmations
 - **Accessibility** — VoiceOver labels on treemap, breadcrumbs, info bar, and progress view
 
 ## Requirements
@@ -45,7 +47,7 @@ Then build and run the **GrandPerspective** scheme.
 xcodebuild test -scheme GrandPerspective -destination "platform=macOS"
 ```
 
-193 tests across 35 suites covering model, layout, filters, views, persistence, file operations, rescan, multi-window, date filters, and filter persistence.
+292 tests across 60 suites covering model, layout, filters, views, persistence, file operations, rescan, multi-window, date filters, filter persistence, filtered scan, rescan selected, inspector panel, package contents, volume display, filter mask, size preferences, scan comments, color palettes, and new color mappings.
 
 ## Architecture
 
@@ -64,7 +66,7 @@ Sources/
     AppState.swift             Central state (@MainActor @Observable)
     FileFilter.swift           Composable filter enum (Codable)
     FilterRepository.swift     Named filter CRUD + JSON persistence
-    ColorMapping.swift         Color schemes (depth, type, date)
+    ColorMapping.swift         18 palettes, 9 color mappings, hex color utilities
     TreemapLayout.swift        Squarified treemap algorithm
     ScanDocument.swift         .gpscan file format (JSON, FileDocument)
 
@@ -78,10 +80,10 @@ Sources/
     ScanProgressView.swift     Real-time progress display
     TypeRankingView.swift      File type breakdown
 
-Tests/                         193 tests, 35 suites (Swift Testing)
+Tests/                         292 tests, 60 suites (Swift Testing)
 Resources/                     App icons, images, localizations
 project.yml                    XcodeGen project definition
-PLAN.md                        Migration plan (Phases 0–9)
+PLAN.md                        Migration plan (Phases 0–14 + Colors)
 ```
 
 ### Key Design Decisions

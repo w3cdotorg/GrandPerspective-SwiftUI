@@ -58,7 +58,7 @@ struct ViewTests {
 
     // MARK: - ImageRenderer snapshot
 
-    @Test func treemapRendersToImage() {
+    @MainActor @Test func treemapRendersToImage() {
         let result = Self.makeScanResult()
         let mapping = FolderColorMapping()
 
@@ -67,6 +67,7 @@ struct ViewTests {
             colorMapping: mapping,
             hoveredNode: .constant(nil)
         )
+        .environment(AppState())
         .frame(width: 400, height: 300)
 
         let renderer = ImageRenderer(content: treemapView)

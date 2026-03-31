@@ -80,9 +80,10 @@ struct AppStateRescanTests {
     }
 
     @Test func rescanScopeEnum() {
-        #expect(AppState.RescanScope.allCases.count == 2)
+        #expect(AppState.RescanScope.allCases.count == 3)
         #expect(AppState.RescanScope.all.rawValue == "Rescan All")
         #expect(AppState.RescanScope.visible.rawValue == "Rescan Visible")
+        #expect(AppState.RescanScope.selected.rawValue == "Rescan Selected")
     }
 
     @Test func defaultRescanActionPreference() {
