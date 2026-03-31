@@ -106,7 +106,6 @@ extension ScanResult {
         let scanner = FileSystemScanner(sizeMeasure: sizeMeasure)
         let tree = try await scanner.scan(url: url)
 
-        let fm = FileManager.default
         let values = try url.resourceValues(forKeys: [
             .volumeTotalCapacityKey,
             .volumeAvailableCapacityKey
@@ -123,7 +122,7 @@ extension ScanResult {
             volumePath = url.path
         }
 
-        var result = ScanResult(
+        let result = ScanResult(
             scanTree: tree,
             volumePath: volumePath,
             volumeSize: volumeSize,
@@ -131,11 +130,6 @@ extension ScanResult {
             sizeMeasure: sizeMeasure,
             appliedFilters: filters
         )
-
-        // Apply filters if any
-        if !filters.isEmpty {
-            // Phase 1: filters are defined but applied in Phase 3
-        }
 
         return result
     }

@@ -82,14 +82,20 @@ final class FileNode: Identifiable, @unchecked Sendable {
     var isHardLinked: Bool { flags.contains(.hardLinked) }
     var isPackage: Bool { flags.contains(.package) }
 
+    /// Cached file count (computed once, lazily).
+    @ObservationIgnored
+    private var _fileCount: UInt64?
+
     /// Number of physical files in this subtree.
     var fileCount: UInt64 {
-        switch kind {
-        case .file, .synthetic:
-            return isPhysical ? 1 : 0
-        case .directory:
-            return children.reduce(0) { $0 + $1.fileCount }
+        if let cached = _fileCount { return cached }
+        let count: UInt64 = switch kind {
+        case .file: isPhysical ? 1 : 0
+        case .synthetic: 0
+        case .directory: children.reduce(0) { $0 + $1.fileCount }
         }
+        _fileCount = count
+        return count
     }
 
     /// Full path from root to this node.
@@ -139,10 +145,14 @@ final class FileNode: Identifiable, @unchecked Sendable {
 // MARK: - Size Formatting
 
 extension FileNode {
+    private nonisolated(unsafe) static let sizeFormatter: ByteCountFormatter = {
+        let f = ByteCountFormatter()
+        f.countStyle = .file
+        return f
+    }()
+
     static func formattedSize(_ bytes: UInt64) -> String {
-        let formatter = ByteCountFormatter()
-        formatter.countStyle = .file
-        return formatter.string(fromByteCount: Int64(clamping: bytes))
+        sizeFormatter.string(fromByteCount: Int64(clamping: bytes))
     }
 
     var formattedSize: String {

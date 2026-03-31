@@ -92,20 +92,22 @@ enum TreemapLayout {
             // Find the best row: keep adding items while aspect ratio improves
             var row: [Int] = [i]
             var rowArea = areas[i]
-            var bestWorst = worstAspectRatio(row: [areas[i]], side: side)
+            var rowAreas: [Double] = [areas[i]]
+            var bestWorst = worstAspectRatio(row: rowAreas, side: side)
 
             var j = i + 1
             while j < areas.count {
-                let candidate = rowArea + areas[j]
+                rowAreas.append(areas[j])
                 let candidateWorst = worstAspectRatio(
-                    row: (i...j).map { areas[$0] },
+                    row: rowAreas,
                     side: side
                 )
                 if candidateWorst > bestWorst {
+                    rowAreas.removeLast()
                     break // Adding this item worsens the layout
                 }
                 row.append(j)
-                rowArea = candidate
+                rowArea += areas[j]
                 bestWorst = candidateWorst
                 j += 1
             }

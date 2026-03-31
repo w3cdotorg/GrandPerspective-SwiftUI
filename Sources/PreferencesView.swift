@@ -20,7 +20,6 @@ struct PreferencesView: View {
 // MARK: - General
 
 struct GeneralPreferencesView: View {
-    // Phase 4: these will connect to @AppStorage / AppState
     @AppStorage("defaultColorMapping") private var defaultColorMapping = "Files & Folders"
     @AppStorage("defaultRescanAction") private var defaultRescanAction = AppState.RescanScope.all.rawValue
 

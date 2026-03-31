@@ -26,6 +26,7 @@ struct BreadcrumbBar: View {
             }
             .buttonStyle(.plain)
             .foregroundStyle(zoomRoot == nil ? .primary : .secondary)
+            .accessibilityLabel(String(localized: "Navigate to scan root"))
 
             ForEach(Array(breadcrumbs.enumerated()), id: \.element.id) { index, node in
                 HStack(spacing: 2) {
@@ -46,6 +47,7 @@ struct BreadcrumbBar: View {
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(isLast ? .primary : .secondary)
+                    .accessibilityLabel(String(localized: "Navigate to \(node.name)"))
                 }
             }
 

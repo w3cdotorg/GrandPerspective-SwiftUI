@@ -50,5 +50,8 @@ struct ScanProgressView: View {
         .padding(40)
         .frame(minWidth: 350)
         .animation(.easeOut(duration: 0.2), value: progress?.filesScanned)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(String(localized: "Scanning \(path)"))
+        .accessibilityValue(progress.map { "\($0.filesScanned) files, \(FileNode.formattedSize($0.totalSize))" } ?? String(localized: "Starting..."))
     }
 }

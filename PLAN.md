@@ -210,14 +210,25 @@ Features manquantes par rapport au legacy : suppression, reveal, rescan.
 **Fichiers modifiés :** `Sources/Model/FileFilter.swift`, `Sources/Model/FilterRepository.swift`, `Sources/Views/FilterEditorView.swift`, `Sources/Views/FilterListView.swift`, `Sources/GrandPerspectiveApp.swift`, `Tests/Phase8Tests.swift`
 ---
 
-## Phase 9 — Nettoyage et finalisation
+## Phase 9 — Nettoyage et finalisation ✅
 
-- [ ] Supprimer `GrandPerspective-Bridging-Header.h` (plus utilisé)
-- [ ] Nettoyer les commentaires "Phase 1+" dans `project.yml`
-- [ ] Supprimer le target `GrandPerspectiveLegacy` de `project.yml` (optionnel, le code reste dans `GrandPerspective/trunk/code/`)
-- [ ] Audit d'accessibilité : labels VoiceOver sur les éléments interactifs
-- [ ] Profiling avec gros répertoires (100k+ fichiers) — optimiser si nécessaire
-- [ ] Documentation : README.md avec instructions de build et architecture
+- [x] Supprimer `GrandPerspective-Bridging-Header.h` (fait lors de la création du repo standalone)
+- [x] Nettoyer les commentaires "Phase N:" obsolètes dans le code source
+- [x] Supprimer le target `GrandPerspectiveLegacy` de `project.yml` (fait lors de la création du repo)
+- [x] Corriger les warnings : `let fm` inutilisé, `var result` → `let result`
+- [x] **Audit d'accessibilité** : labels VoiceOver ajoutés sur :
+  - Treemap Canvas (label, value dynamique, hint)
+  - BreadcrumbBar (label par bouton de navigation)
+  - NodeInfoBar (combiné avec accessibilityElement)
+  - ScanProgressView (label + value dynamique)
+- [x] **Optimisations performance** pour gros répertoires :
+  - `FileNode.fileCount` mis en cache (lazy, `@ObservationIgnored`)
+  - `ByteCountFormatter` réutilisé (singleton `nonisolated(unsafe) static`)
+  - `TreemapLayout.squarify` — suppression de l'allocation `(i...j).map` dans la boucle interne
+- [x] **Documentation** : README.md complet avec architecture, design decisions, arborescence
+- [x] **7 tests** : 3 suites (FileNode Optimizations, TreemapLayout Performance, Cleanup Verification)
+
+**Fichiers modifiés :** `Sources/Model/FileNode.swift`, `Sources/Model/ScanResult.swift`, `Sources/Model/TreemapLayout.swift`, `Sources/Views/TreemapCanvasView.swift`, `Sources/Views/BreadcrumbBar.swift`, `Sources/Views/ScanProgressView.swift`, `Sources/ContentView.swift`, `Sources/PreferencesView.swift`, `README.md`, `Tests/Phase9Tests.swift`
 
 ---
 
@@ -234,7 +245,7 @@ Features manquantes par rapport au legacy : suppression, reveal, rescan.
 
 ---
 
-## Tests — 193 tests, 35 suites ✅
+## Tests — 200 tests, 38 suites ✅
 
 | Suite | Tests | Couverture |
 |---|---|---|

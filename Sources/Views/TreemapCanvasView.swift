@@ -73,6 +73,9 @@ struct TreemapCanvasView: View {
                 }
             }
         }
+        .accessibilityLabel(String(localized: "Treemap visualization"))
+        .accessibilityValue(hoveredNode.map { "\($0.name), \($0.formattedSize)" } ?? "")
+        .accessibilityHint(String(localized: "Click a folder to zoom in. Right-click for actions."))
         .contextMenu {
             if let node = hoveredNode {
                 Button(String(localized: "Open")) {

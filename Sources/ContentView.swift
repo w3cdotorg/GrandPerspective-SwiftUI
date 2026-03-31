@@ -259,7 +259,7 @@ struct WelcomeView: View {
     }
 }
 
-// MARK: - Treemap View (legacy wrapper kept for test compatibility)
+// MARK: - Treemap View (convenience wrapper for tests)
 
 struct TreemapView: View {
     let scanResult: ScanResult
@@ -302,6 +302,8 @@ struct NodeInfoBar: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 6)
         .background(.ultraThinMaterial)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(String(localized: "\(node.name), \(node.formattedSize)"))
     }
 }
 
