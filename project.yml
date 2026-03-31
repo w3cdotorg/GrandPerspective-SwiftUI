@@ -1,0 +1,65 @@
+name: GrandPerspective
+options:
+  bundleIdPrefix: net.sourceforge
+  deploymentTarget:
+    macOS: "26.0"
+  xcodeVersion: "16.0"
+
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    MACOSX_DEPLOYMENT_TARGET: "26.0"
+
+schemes:
+  GrandPerspective:
+    build:
+      targets:
+        GrandPerspective: all
+        GrandPerspectiveTests: [test]
+    test:
+      targets:
+        - GrandPerspectiveTests
+
+targets:
+
+  GrandPerspective:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+        type: group
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: net.sourceforge.grandperspectiv
+        PRODUCT_NAME: GrandPerspective
+        INFOPLIST_FILE: Sources/Info.plist
+        GENERATE_INFOPLIST_FILE: false
+        SWIFT_VERSION: "6.0"
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
+    resources:
+      - path: Resources/Images
+        type: folder
+      - path: Resources/GrandPerspective.icns
+      - path: Resources/GrandPerspectiveScan.icns
+      - path: Resources/Credits.rtf
+      - path: Resources/English.lproj
+        type: folder
+    entitlements:
+      path: Sources/GrandPerspective.entitlements
+
+  GrandPerspectiveTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests
+        type: group
+    dependencies:
+      - target: GrandPerspective
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: net.sourceforge.grandperspectiv.tests
+        SWIFT_VERSION: "6.0"
+        MACOSX_DEPLOYMENT_TARGET: "26.0"
+        GENERATE_INFOPLIST_FILE: true
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/GrandPerspective.app/Contents/MacOS/GrandPerspective"
+        BUNDLE_LOADER: "$(TEST_HOST)"
