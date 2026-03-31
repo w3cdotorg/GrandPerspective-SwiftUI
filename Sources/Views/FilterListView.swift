@@ -91,7 +91,19 @@ func describeFilter(_ filter: FileFilter) -> String {
     case .not(let inner): return "NOT (\(describeFilter(inner)))"
     case .and(let sub): return sub.map { describeFilter($0) }.joined(separator: " AND ")
     case .or(let sub): return sub.map { describeFilter($0) }.joined(separator: " OR ")
+    case .creationDateRange(let min, let max): return "Created: \(formatDateRange(min, max))"
+    case .modificationDateRange(let min, let max): return "Modified: \(formatDateRange(min, max))"
+    case .accessDateRange(let min, let max): return "Accessed: \(formatDateRange(min, max))"
     case .filesOnly(let inner): return "Files: \(describeFilter(inner))"
     case .directoriesOnly(let inner): return "Dirs: \(describeFilter(inner))"
     }
+}
+
+private func formatDateRange(_ min: Date?, _ max: Date?) -> String {
+    let fmt = DateFormatter()
+    fmt.dateStyle = .medium
+    fmt.timeStyle = .none
+    let lo = min.map { fmt.string(from: $0) } ?? "..."
+    let hi = max.map { fmt.string(from: $0) } ?? "..."
+    return "\(lo) – \(hi)"
 }

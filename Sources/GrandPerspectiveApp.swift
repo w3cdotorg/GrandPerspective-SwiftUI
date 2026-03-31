@@ -30,6 +30,7 @@ struct ScanWindow: View {
         ContentView()
             .environment(appState)
             .onAppear {
+                appState.filterRepository.loadFromDisk()
                 if let transfer = WindowTransfer.shared.consume() {
                     appState.loadScanResult(
                         transfer.scanResult,

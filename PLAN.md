@@ -192,17 +192,22 @@ Features manquantes par rapport au legacy : suppression, reveal, rescan.
 
 ---
 
-## Phase 8 — Filtres par date et persistance des filtres
+## Phase 8 — Filtres par date et persistance des filtres ✅
 
-- [ ] **Filtres par date** (remplace `ItemCreationDateTest`, `ItemModificationDateTest`, `ItemAccessDateTest`)
-  - Nouveau case `FileFilter.dateRange(keyPath:min:max:)` pour creation/modification/access
-  - Ou trois cases dédiés : `.creationDateRange`, `.modificationDateRange`, `.accessDateRange`
-  - UI : `FilterTestRow.TestType.date` avec deux `DatePicker` (min/max) + sélecteur de champ
+- [x] **Filtres par date** (remplace `ItemCreationDateTest`, `ItemModificationDateTest`, `ItemAccessDateTest`)
+  - Trois cases dédiés : `.creationDateRange(min:max:)`, `.modificationDateRange(min:max:)`, `.accessDateRange(min:max:)`
+  - UI : `FilterTestRow.TestType.date` avec `DateField` picker (Creation/Modification/Access) + deux `DatePicker` (min/max)
   - Round-trip `FilterTestRow` ↔ `FileFilter` pour les filtres par date
-- [ ] **Persistance des filtres entre sessions** (remplace la sauvegarde NSUserDefaults legacy)
+  - `describeFilter` mis à jour pour afficher les plages de dates
+- [x] **Persistance des filtres entre sessions** (remplace la sauvegarde NSUserDefaults legacy)
   - `FilterRepository` sauvegardé en JSON dans `Application Support/GrandPerspective/filters.json`
-  - Chargement au démarrage, sauvegarde automatique à chaque modification
-  - `NamedFilter` rendu `Codable` (nécessite `FileFilter: Codable`)
+  - Chargement au démarrage via `loadFromDisk()`, sauvegarde automatique avec debounce 500ms
+  - `FileFilter: Codable` — encodage discriminé par type avec `CodingCase` enum
+  - `NamedFilter: Codable` — ID stable pour persistance
+  - `FilterRepository` accepte un `storageURL` injectable (testable)
+- [x] **24 tests** : 5 suites (Date Filters, FileFilter Codable, NamedFilter Codable, FilterRepository Persistence, Date FilterTestRow)
+
+**Fichiers modifiés :** `Sources/Model/FileFilter.swift`, `Sources/Model/FilterRepository.swift`, `Sources/Views/FilterEditorView.swift`, `Sources/Views/FilterListView.swift`, `Sources/GrandPerspectiveApp.swift`, `Tests/Phase8Tests.swift`
 ---
 
 ## Phase 9 — Nettoyage et finalisation
@@ -229,7 +234,7 @@ Features manquantes par rapport au legacy : suppression, reveal, rescan.
 
 ---
 
-## Tests — 169 tests, 30 suites ✅
+## Tests — 193 tests, 35 suites ✅
 
 | Suite | Tests | Couverture |
 |---|---|---|

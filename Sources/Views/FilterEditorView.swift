@@ -118,6 +118,9 @@ struct FilterTestRow: Identifiable {
     var sizeUnit: SizeUnit = .mb
     var typeIdentifier: String = ""
     var strictType: Bool = false
+    var dateField: DateField = .modification
+    var minDate: Date?
+    var maxDate: Date?
     var targetKind: TargetKind = .files
 
     enum TestType: String, CaseIterable, Identifiable {
@@ -126,7 +129,14 @@ struct FilterTestRow: Identifiable {
         case size = "Size"
         case type = "File Type"
         case flags = "Flags"
+        case date = "Date"
         var id: String { rawValue }
+    }
+
+    enum DateField: String, CaseIterable {
+        case creation = "Creation"
+        case modification = "Modification"
+        case access = "Access"
     }
 
     enum SizeUnit: String, CaseIterable {
@@ -199,6 +209,21 @@ struct FilterTestRow: Identifiable {
         case .hasFlags(let flags):
             testType = .flags
             namePattern = flags.contains(.hardLinked) ? "hard-linked" : "package"
+        case .creationDateRange(let min, let max):
+            testType = .date
+            dateField = .creation
+            minDate = min
+            maxDate = max
+        case .modificationDateRange(let min, let max):
+            testType = .date
+            dateField = .modification
+            minDate = min
+            maxDate = max
+        case .accessDateRange(let min, let max):
+            testType = .date
+            dateField = .access
+            minDate = min
+            maxDate = max
         default:
             break
         }
@@ -229,6 +254,13 @@ struct FilterTestRow: Identifiable {
         case .flags:
             let flags: FileNode.Flags = namePattern.contains("hard") ? .hardLinked : .package
             base = .hasFlags(flags)
+        case .date:
+            guard minDate != nil || maxDate != nil else { return nil }
+            switch dateField {
+            case .creation: base = .creationDateRange(min: minDate, max: maxDate)
+            case .modification: base = .modificationDateRange(min: minDate, max: maxDate)
+            case .access: base = .accessDateRange(min: minDate, max: maxDate)
+            }
         }
 
         guard var result = base else { return nil }
@@ -303,6 +335,31 @@ struct FilterTestRowView: View {
                 Picker("Flag:", selection: $test.namePattern) {
                     Text("Hard-linked").tag("hard-linked")
                     Text("Package").tag("package")
+                }
+            case .date:
+                HStack {
+                    Picker("Field:", selection: $test.dateField) {
+                        ForEach(FilterTestRow.DateField.allCases, id: \.self) { field in
+                            Text(field.rawValue).tag(field)
+                        }
+                    }
+                    .frame(width: 160)
+                    DatePicker(
+                        "From:",
+                        selection: Binding(
+                            get: { test.minDate ?? .distantPast },
+                            set: { test.minDate = $0 }
+                        ),
+                        displayedComponents: .date
+                    )
+                    DatePicker(
+                        "To:",
+                        selection: Binding(
+                            get: { test.maxDate ?? .now },
+                            set: { test.maxDate = $0 }
+                        ),
+                        displayedComponents: .date
+                    )
                 }
             }
         }
