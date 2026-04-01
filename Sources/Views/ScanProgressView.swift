@@ -18,14 +18,19 @@ struct ScanProgressView: View {
                 .font(.title3)
                 .fontWeight(.medium)
 
-            Text(path)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .truncationMode(.middle)
-
             if let p = progress {
                 VStack(spacing: 8) {
+                    // Current directory being scanned
+                    if !p.currentDirectory.isEmpty {
+                        Text(p.currentDirectory)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
+                            .truncationMode(.head)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentTransition(.numericText())
+                    }
+
                     HStack {
                         Label("\(p.filesScanned.formatted()) files", systemImage: "doc")
                         Spacer()
@@ -40,6 +45,12 @@ struct ScanProgressView: View {
                 }
                 .transition(.opacity)
             } else {
+                Text(path)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+
                 ProgressView()
                     .controlSize(.large)
             }

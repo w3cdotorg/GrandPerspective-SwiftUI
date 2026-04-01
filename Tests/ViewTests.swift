@@ -32,10 +32,11 @@ struct ViewTests {
         let bounds = CGRect(x: 0, y: 0, width: 800, height: 600)
         let rects = TreemapLayout.layout(root: result.scanTree, in: bounds)
 
-        // Should have 4 leaf files
-        #expect(rects.count == 4)
+        // Should contain 4 leaf files (plus directory background rects)
+        let leaves = rects.filter { !$0.node.isDirectory }
+        #expect(leaves.count == 4)
 
-        let names = Set(rects.map { $0.node.name })
+        let names = Set(leaves.map { $0.node.name })
         #expect(names.contains("vacation.jpg"))
         #expect(names.contains("cat.png"))
         #expect(names.contains("notes.txt"))
@@ -98,7 +99,8 @@ struct ViewTests {
         let bounds = CGRect(x: 0, y: 0, width: 400, height: 300)
         let rects = TreemapLayout.layout(root: root, in: bounds)
 
-        #expect(rects.count == 2)
+        let leaves = rects.filter { !$0.node.isDirectory }
+        #expect(leaves.count == 2)
 
         let mapping = FolderColorMapping()
         for rect in rects {
@@ -106,7 +108,7 @@ struct ViewTests {
             #expect(color != Color.gray)
         }
 
-        let totalArea = rects.reduce(0.0) { $0 + Double($1.rect.width * $1.rect.height) }
+        let totalArea = leaves.reduce(0.0) { $0 + Double($1.rect.width * $1.rect.height) }
         let expectedArea = Double(bounds.width * bounds.height)
         #expect(abs(totalArea - expectedArea) / expectedArea < 0.01)
     }

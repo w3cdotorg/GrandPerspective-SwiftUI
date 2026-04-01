@@ -24,14 +24,21 @@ struct TreemapLayoutTests {
         ])
     }
 
+    /// Filter rects to only leaf nodes (files), excluding directory background rects.
+    static func leafRects(_ rects: [TreemapRect]) -> [TreemapRect] {
+        rects.filter { !$0.node.isDirectory }
+    }
+
     // MARK: - Basic layout
 
     @Test func layoutProducesRectsForLeaves() {
         let root = Self.makeSimpleTree()
         let bounds = CGRect(x: 0, y: 0, width: 100, height: 100)
         let rects = TreemapLayout.layout(root: root, in: bounds)
+        let leaves = Self.leafRects(rects)
 
-        #expect(rects.count == 2)
+        // 2 files + 1 directory background
+        #expect(leaves.count == 2)
         // All rects should be within bounds
         for r in rects {
             #expect(r.rect.minX >= bounds.minX - 1)
@@ -61,11 +68,12 @@ struct TreemapLayoutTests {
         let root = Self.makeSimpleTree()
         let bounds = CGRect(x: 0, y: 0, width: 200, height: 150)
         let rects = TreemapLayout.layout(root: root, in: bounds)
+        let leaves = Self.leafRects(rects)
 
-        let totalArea = rects.reduce(0.0) { $0 + Double($1.rect.width * $1.rect.height) }
+        let totalArea = leaves.reduce(0.0) { $0 + Double($1.rect.width * $1.rect.height) }
         let boundsArea = Double(bounds.width * bounds.height)
 
-        // Total area should approximately equal bounds area (within 1% tolerance)
+        // Leaf area should approximately equal bounds area (within 1% tolerance)
         #expect(abs(totalArea - boundsArea) / boundsArea < 0.01)
     }
 
@@ -90,8 +98,12 @@ struct TreemapLayoutTests {
         let bounds = CGRect(x: 0, y: 0, width: 200, height: 200)
         let rects = TreemapLayout.layout(root: root, in: bounds, maxDepth: 1)
 
-        // At maxDepth 1: "a" directory rendered as leaf (depth 1) + "b.txt" (depth 1)
-        #expect(rects.count == 2)
+        // At maxDepth 1: root background + "a" as leaf (depth 1) + "b.txt" (depth 1)
+        let leaves = Self.leafRects(rects)
+        // "a" is rendered as leaf at depth 1, "b.txt" at depth 1
+        // Plus "a" counts as a directory leaf here (maxDepth reached)
+        let nonRootRects = rects.filter { $0.depth >= 1 }
+        #expect(nonRootRects.count == 2)
         #expect(rects.allSatisfy { $0.depth <= 1 })
     }
 
@@ -121,10 +133,11 @@ struct TreemapLayoutTests {
         ])
         let bounds = CGRect(x: 0, y: 0, width: 100, height: 100)
         let rects = TreemapLayout.layout(root: root, in: bounds)
+        let leaves = Self.leafRects(rects)
 
-        // Only the non-zero file should appear
-        #expect(rects.count == 1)
-        #expect(rects[0].node.name == "real.txt")
+        // Only the non-zero file should appear as leaf
+        #expect(leaves.count == 1)
+        #expect(leaves[0].node.name == "real.txt")
     }
 
     @Test func zeroBoundsReturnsEmpty() {
@@ -140,16 +153,18 @@ struct TreemapLayoutTests {
         let root = FileNode(name: "big", kind: .directory, size: totalSize, children: children)
         let bounds = CGRect(x: 0, y: 0, width: 800, height: 600)
         let rects = TreemapLayout.layout(root: root, in: bounds)
+        let leaves = Self.leafRects(rects)
 
-        #expect(rects.count == 100)
+        // 100 files (directory background is also emitted but filtered)
+        #expect(leaves.count == 100)
 
-        // No overlapping rects (check centers are unique)
-        let centers = rects.map { CGPoint(x: $0.rect.midX, y: $0.rect.midY) }
+        // No overlapping leaf rects (check centers are unique)
+        let centers = leaves.map { CGPoint(x: $0.rect.midX, y: $0.rect.midY) }
         let uniqueCenters = Set(centers.map { "\(Int($0.x)),\(Int($0.y))" })
         #expect(uniqueCenters.count == 100)
     }
 
-    // MARK: - Non-overlapping
+    // MARK: - Non-overlapping (leaf rects only)
 
     @Test func rectsDoNotOverlap() {
         let children = (0..<10).map { i in
@@ -159,15 +174,30 @@ struct TreemapLayoutTests {
         let root = FileNode(name: "root", kind: .directory, size: total, children: children)
         let bounds = CGRect(x: 0, y: 0, width: 400, height: 300)
         let rects = TreemapLayout.layout(root: root, in: bounds)
+        let leaves = Self.leafRects(rects)
 
-        for i in 0..<rects.count {
-            for j in (i+1)..<rects.count {
-                let a = rects[i].rect.insetBy(dx: 1, dy: 1)
-                let b = rects[j].rect.insetBy(dx: 1, dy: 1)
+        for i in 0..<leaves.count {
+            for j in (i+1)..<leaves.count {
+                let a = leaves[i].rect.insetBy(dx: 1, dy: 1)
+                let b = leaves[j].rect.insetBy(dx: 1, dy: 1)
                 let intersection = a.intersection(b)
                 #expect(intersection.isNull || intersection.width < 2 || intersection.height < 2,
-                       "Rects \(rects[i].node.name) and \(rects[j].node.name) overlap")
+                       "Rects \(leaves[i].node.name) and \(leaves[j].node.name) overlap")
             }
         }
+    }
+
+    // MARK: - Directory background rects
+
+    @Test func directoryEmitsBackgroundRect() {
+        let root = Self.makeSimpleTree()
+        let bounds = CGRect(x: 0, y: 0, width: 200, height: 200)
+        let rects = TreemapLayout.layout(root: root, in: bounds)
+
+        // Root directory should be emitted as a background rect
+        let rootRect = rects.first { $0.node.name == "root" }
+        #expect(rootRect != nil)
+        // It should be the first rect (drawn under children)
+        #expect(rects[0].node.name == "root")
     }
 }

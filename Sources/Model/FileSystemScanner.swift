@@ -13,6 +13,7 @@ actor FileSystemScanner {
     struct Progress: Sendable {
         var filesScanned: UInt64 = 0
         var totalSize: UInt64 = 0
+        var currentDirectory: String = ""
     }
 
     private let sizeMeasure: SizeMeasure
@@ -69,6 +70,9 @@ actor FileSystemScanner {
         let values = try url.resourceValues(forKeys: resourceKeys)
         let name = values.name ?? url.lastPathComponent
 
+        // Report current directory being scanned (throttled via file count)
+        progress.currentDirectory = url.path
+
         var childNodes: [FileNode] = []
         var totalSize: UInt64 = 0
 
@@ -117,7 +121,7 @@ actor FileSystemScanner {
 
                 progress.filesScanned += 1
                 progress.totalSize += fileNode.size
-                if progress.filesScanned.isMultiple(of: 500) {
+                if progress.filesScanned.isMultiple(of: 200) {
                     progressContinuation.yield(progress)
                 }
             }

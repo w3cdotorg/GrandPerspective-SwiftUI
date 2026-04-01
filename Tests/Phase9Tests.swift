@@ -67,9 +67,11 @@ struct TreemapLayoutPerformanceTests {
         let bounds = CGRect(x: 0, y: 0, width: 1920, height: 1080)
         let rects = TreemapLayout.layout(root: root, in: bounds)
 
-        // Should produce rects for nearly all 10k files (some tiny ones may be skipped)
-        #expect(rects.count >= 9_900)
-        #expect(rects.count <= 10_000)
+        // Should produce rects for nearly all 10k files plus directory background rects
+        // (100 dirs + 1 root = 101 background rects, plus ~10k leaf rects)
+        let leaves = rects.filter { !$0.node.isDirectory }
+        #expect(leaves.count >= 9_900)
+        #expect(leaves.count <= 10_000)
 
         // All rects should be within bounds
         for r in rects {

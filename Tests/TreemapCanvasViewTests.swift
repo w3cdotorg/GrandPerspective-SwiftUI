@@ -60,10 +60,11 @@ struct TreemapCanvasViewTests {
 
         let bounds = CGRect(x: 0, y: 0, width: 600, height: 400)
         let rects = TreemapLayout.layout(root: photos, in: bounds)
+        let leaves = rects.filter { !$0.node.isDirectory }
 
-        // Only photos children should appear
-        #expect(rects.count == 2)
-        let names = Set(rects.map { $0.node.name })
+        // Only photos children should appear as leaves
+        #expect(leaves.count == 2)
+        let names = Set(leaves.map { $0.node.name })
         #expect(names == ["vacation.jpg", "cat.png"])
     }
 
@@ -73,8 +74,9 @@ struct TreemapCanvasViewTests {
 
         let bounds = CGRect(x: 0, y: 0, width: 600, height: 400)
         let rects = TreemapLayout.layout(root: photos, in: bounds)
+        let leaves = rects.filter { !$0.node.isDirectory }
 
-        let totalArea = rects.reduce(0.0) { $0 + Double($1.rect.width * $1.rect.height) }
+        let totalArea = leaves.reduce(0.0) { $0 + Double($1.rect.width * $1.rect.height) }
         let expectedArea = Double(bounds.width * bounds.height)
         #expect(abs(totalArea - expectedArea) / expectedArea < 0.01)
     }
@@ -85,9 +87,10 @@ struct TreemapCanvasViewTests {
         let result = Self.makeScanResult()
         let bounds = CGRect(x: 0, y: 0, width: 600, height: 400)
         let rects = TreemapLayout.layout(root: result.scanTree, in: bounds)
+        let leaves = rects.filter { !$0.node.isDirectory }
 
-        // Each rect center should find itself
-        for treemapRect in rects {
+        // Each leaf rect center should find itself (last = topmost = child over parent)
+        for treemapRect in leaves {
             let center = CGPoint(x: treemapRect.rect.midX, y: treemapRect.rect.midY)
             let hit = rects.last { $0.rect.contains(center) }
             #expect(hit != nil)
